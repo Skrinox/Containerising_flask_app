@@ -14,6 +14,8 @@ from flask import request
 from flask import render_template
 from flask import url_for
 from flask.json import jsonify
+from pymongo import MongoClient
+import json
 
 ##########################################################################
 ## Application Setup
@@ -21,13 +23,44 @@ from flask.json import jsonify
 
 app = Flask(__name__)
 
+def check_mongo_connection(client):
+    res = None
+    try:
+        client = MongoClient(os.getenv("MONGO_HOST", "localhost"), 27017, serverSelectionTimeoutMS=2000)
+        res = client.server_info()  # Force connection
+
+        return res
+    except Exception as e:
+        return res
+
+def populate_db(client):
+    db = client["testdb"]
+    collection = db["users"]
+
+    # checks if users already exists
+    if collection.count_documents({}) == 0:
+        data = [
+        {"name": "test", "email": "test@gmail.com"},
+        {"name": "lala", "email": "lala@gmail.com"},
+        {"name": "lala2", "email": "lala2@gmail.com"}
+        ]
+        collection.insert_many(data)
+
 ##########################################################################
 ## Routes
 ##########################################################################
 
 @app.route("/")
 def home():
-    return render_template("home.html")
+    client = MongoClient(os.getenv("MONGO_HOST", "localhost"), 27017, serverSelectionTimeoutMS=2000)
+
+    connected = check_mongo_connection(client)
+    populate_db(client)
+    db = client["testdb"]
+    collection = db["users"]
+    users = list(collection.find())
+
+    return render_template("home.html", mongo_status=connected, users=users)
 
 @app.route("/api/hello")
 def hello():
